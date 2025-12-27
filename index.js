@@ -28,7 +28,7 @@ const writeDB = (data) => {
     }
 };
 
-// --- UPDATED ROUTE: HANDLES POST ---
+// --- UPDATED ROUTE: HANDLES POST (Used by EA) ---
 app.post('/', (req, res) => {
     try {
         // 1. Check if body exists
@@ -62,9 +62,8 @@ app.post('/', (req, res) => {
     }
 });
 
-// --- OPTIONAL: GET FALLBACK (Keeps old compatibility for simple browsers) ---
+// --- OPTIONAL: GET FALLBACK (Keeps old compatibility) ---
 app.get('/', (req, res) => {
-    // If you want to support the old GET method as well, keep this.
     const id = req.query.id;
     if (id) {
         console.log(`Received GET request with ID: ${id}`);
@@ -79,5 +78,4 @@ app.get('/', (req, res) => {
 const PORT = 3000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-});
 });
