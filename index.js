@@ -1,70 +1,83 @@
 const express = require('express');
-const cors = require('cors');
-const bodyParser = require('body-parser');
 const fs = require('fs');
-const path = require('path');
-
 const app = express();
-const PORT = process.env.PORT || 10000;
-const DB_FILE = path.join(__dirname, 'database.json');
+app.use(express.json());
 
-// Middleware
-app.use(cors());
-app.use(bodyParser.json());
+const DB_FILE = 'database.json';
 
-// --- ROUTE 1: GET (Used by the EA to Check License) ---
-app.get('/', (req, res) => {
-    const searchId = req.query.id;
-    
-    if (!searchId) {
-        return res.json({ status: "error", message: "No ID provided" });
+// Helper to read DB
+const readDB = () => {
+    try {
+        if (fs.existsSync(DB_FILE)) {
+            return JSON.parse(fs.readFileSync(DB_FILE));
+        }
+        return [];
+    } catch (e) {
+        console.error("Error reading DB:", e);
+        return [];
     }
+};
 
-    // Read database
-    fs.readFile(DB_FILE, 'utf8', (err, data) => {
-        if (err) {
-            console.error("Error reading DB:", err);
-            return res.json({ status: "error", message: "Server Error" });
-        }
+// Helper to write DB
+const writeDB = (data) => {
+    try {
+        fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+        console.log("Database updated.");
+    } catch (e) {
+        console.error("Error writing DB:", e);
+    }
+};
 
-        let licenses = [];
-        try {
-            licenses = JSON.parse(data);
-        } catch (e) {
-            licenses = [];
-        }
-
-        // Find the license
-        const found = licenses.find(lic => lic.id === searchId);
-
-        if (found) {
-            res.json({ status: "found", data: found });
-        } else {
-            res.json({ status: "not_found", message: "Invalid License Key" });
-        }
-    });
-});
-
-// --- ROUTE 2: POST (Used by Control Panel to Update DB) ---
+// --- UPDATED ROUTE: HANDLES POST ---
 app.post('/', (req, res) => {
-    const newData = req.body;
-
-    if (!newData) {
-        return res.status(400).json({ status: "error", message: "No data received" });
-    }
-
-    // Overwrite the database file
-    fs.writeFile(DB_FILE, JSON.stringify(newData, null, 2), (err) => {
-        if (err) {
-            console.error("Error writing DB:", err);
-            return res.status(500).json({ status: "error", message: "Write Failed" });
+    try {
+        // 1. Check if body exists
+        if (!req.body) {
+            return res.status(400).json({status:"error", message:"No Body Data (JSON missing)"});
         }
-        console.log("Database updated successfully.");
-        res.json({ status: "success", message: "Database updated!" });
-    });
+
+        // 2. Parse JSON Body
+        const data = JSON.parse(req.body);
+        const id = data.id;
+
+        console.log(`Received POST request with ID: ${id}`);
+
+        // 3. Read DB
+        const licenses = readDB();
+
+        // 4. Check Logic
+        const license = licenses.find(l => l.id === id);
+
+        if (license) {
+            // Found - Return success
+            return res.json({status:"found", data:license});
+        } else {
+            // Not Found - Return error
+            return res.json({status:"error", message:"Invalid License Key"});
+        }
+
+    } catch (e) {
+        console.error("Server Error:", e);
+        return res.status(500).json({status:"error", message:"Internal Server Error"});
+    }
 });
 
-// Start Server
+// --- OPTIONAL: GET FALLBACK (Keeps old compatibility for simple browsers) ---
+app.get('/', (req, res) => {
+    // If you want to support the old GET method as well, keep this.
+    const id = req.query.id;
+    if (id) {
+        console.log(`Received GET request with ID: ${id}`);
+        const licenses = readDB();
+        const license = licenses.find(l => l.id === id);
+        return res.json(license ? {status:"found", data:license} : {status:"error", message:"Invalid License Key"});
+    } else {
+        return res.send("License API is running. Use POST for verification.");
+    }
+});
+
+const PORT = 3000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+});
 });
